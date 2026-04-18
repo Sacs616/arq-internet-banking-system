@@ -1,0 +1,25 @@
+C4Context
+  title System Context — Internet Banking Platform
+
+  Person(client, "Retail client", "Uses the SPA or mobile app to view accounts and make payments")
+
+  System_Boundary(bank, "Bank perimeter") {
+    System(platform, "Internet Banking Platform", "SPA · Mobile app · API services · Event bus · Data stores")
+  }
+
+  System_Ext(core, "Core Banking", "On-premise mainframe. Authoritative account ledger.")
+  System_Ext(supplement, "Client Supplement", "Standalone system. Completes client profile data on demand.")
+  System_Ext(notif, "Notification Providers", "FCM · Twilio · SendGrid. Push, SMS and email delivery.")
+  System_Ext(openbank, "Open Banking APIs", "PSD2-compliant third-party provider access.")
+  System_Ext(legacy, "Legacy Systems", "Mainframe and ESB integrations.")
+  System_Ext(audit, "Audit Store", "WORM-compliant immutable event log. On-premise.")
+
+  Rel(client, platform, "Views balances, makes transfers", "HTTPS / WSS")
+  Rel(platform, core, "Reads and writes account data", "ISO 8583 / mTLS")
+  Rel(platform, supplement, "Fetches missing client info", "REST / mTLS")
+  Rel(platform, notif, "Sends notifications", "AMQP → HTTPS")
+  Rel(platform, openbank, "Exposes PSD2 endpoints", "OAuth2 / REST")
+  Rel(platform, legacy, "Integrates via adapter", "MQ / SOAP")
+  Rel(platform, audit, "Publishes all user actions", "Kafka → WORM")
+
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")

@@ -1,0 +1,34 @@
+C4Component
+  title Component Diagram — Movement Service [Container: Java / Spring]
+
+  Container_Ext(gateway, "API Gateway", "Kong / Envoy", "Routes inbound payment requests")
+  Container_Ext(integration, "Integration Service", "Java / Spring", "ACL — Core Banking and Supplement adapters")
+  ContainerDb_Ext(opsdb, "Operational DB", "PostgreSQL HA", "Write model — ledger and outbox tables")
+  ContainerDb_Ext(cache, "Cache", "Redis Cluster", "Balance read model — Cache-Aside")
+  ContainerDb_Ext(eventbus, "Event Bus", "Apache Kafka", "Receives outbox relay output")
+
+  Container_Boundary(movement, "Movement Service") {
+    Component(validator, "Request Validator", "Spring component", "Validates schema, amount limits and idempotency key. Rejects malformed requests at perimeter.")
+    Component(saga, "Saga Orchestrator", "Axon Framework", "Coordinates multi-step payment flow. Issues compensating transactions on any step failure.")
+    Component(fraud, "Fraud Screener", "Rules + ML gRPC", "Synchronous velocity and ML scoring under 200ms. Async deep analysis for high-risk.")
+    Component(ledger, "Ledger Writer", "Spring + JDBC", "Writes double-entry ledger record and outbox event in single ACID transaction.")
+    Component(balanceq, "Balance Query", "Spring component", "Serves read requests from Redis cache. Falls back to PostgreSQL on cache miss.")
+    Component(outbox, "Outbox Publisher", "Debezium CDC", "Polls outbox table. Publishes to Kafka with idempotent producer. Marks records as published.")
+    Component(auditpub, "Audit Emitter", "Kafka producer", "Emits HMAC-signed movement events for every completed or failed operation.")
+  }
+
+  Rel(gateway, validator, "POST /transfers", "gRPC / mTLS")
+  Rel(gateway, balanceq, "GET /balances", "gRPC / mTLS")
+  Rel(validator, saga, "Dispatches valid command", "in-process")
+  Rel(saga, fraud, "Requests fraud score", "in-process")
+  Rel(saga, integration, "Executes Core Banking debit/credit", "gRPC / mTLS")
+  Rel(saga, ledger, "Writes ledger and outbox", "in-process")
+  Rel(ledger, opsdb, "Single ACID commit", "JDBC / TLS")
+  Rel(outbox, opsdb, "Polls outbox table", "JDBC / TLS")
+  Rel(outbox, eventbus, "Publishes payment events", "Kafka / SASL-TLS")
+  Rel(balanceq, cache, "Reads balance", "Redis / TLS")
+  Rel(balanceq, opsdb, "Fallback on cache miss", "JDBC / TLS")
+  Rel(saga, auditpub, "Emits movement event", "in-process")
+  Rel(auditpub, eventbus, "Publishes audit events", "Kafka / SASL-TLS")
+
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")

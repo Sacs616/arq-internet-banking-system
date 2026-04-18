@@ -1,0 +1,31 @@
+C4Component
+  title Component Diagram — Notification Service [Container: Node.js]
+
+  ContainerDb_Ext(eventbus, "Event Bus", "Apache Kafka", "Source of all domain events")
+  System_Ext(fcm, "FCM / APNs", "Google and Apple push services")
+  System_Ext(sms, "SMS Provider", "Twilio / AWS SNS")
+  System_Ext(email, "Email Provider", "SendGrid / AWS SES")
+
+  Container_Boundary(notification, "Notification Service") {
+    Component(consumer, "Event Consumer", "Kafka consumer group", "Subscribes to payment, auth and alert topics. Commits offset only after successful dispatch.")
+    Component(dispatcher, "Dispatcher", "Strategy selector", "Selects channel strategy per event type and user preference. Invokes fallback chain on failure.")
+    Component(push, "Push Adapter", "FCM / APNs SDK", "Formats and sends push notification. Returns delivery receipt.")
+    Component(smsadapter, "SMS Adapter", "Twilio SDK", "Formats and sends SMS. Handles E.164 normalisation.")
+    Component(emailadapter, "Email Adapter", "SendGrid SDK", "Renders template. Sends email. Tracks delivery status.")
+    Component(fallback, "Fallback Chain", "Chain of Responsibility", "Push fails → SMS. SMS fails → Email. Logs each failure with trace ID.")
+    Component(templateengine, "Template Engine", "Handlebars", "Renders localised notification content. Sanitises all user-supplied values.")
+  }
+
+  Rel(eventbus, consumer, "Delivers domain events", "Kafka consumer / SASL-TLS")
+  Rel(consumer, dispatcher, "Routes event", "in-process")
+  Rel(dispatcher, templateengine, "Renders content", "in-process")
+  Rel(dispatcher, push, "Sends push (primary)", "in-process")
+  Rel(dispatcher, fallback, "On push failure", "in-process")
+  Rel(fallback, smsadapter, "Sends SMS (secondary)", "in-process")
+  Rel(fallback, emailadapter, "Sends email (tertiary)", "in-process")
+  Rel(push, fcm, "Delivers push notification", "HTTPS / FCM API")
+  Rel(smsadapter, sms, "Delivers SMS", "HTTPS / Twilio API")
+  Rel(emailadapter, email, "Delivers email", "HTTPS / SendGrid API")
+
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+  

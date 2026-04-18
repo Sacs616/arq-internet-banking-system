@@ -1,0 +1,32 @@
+C4Component
+  title Component Diagram — Integration Service [Container: Java / Spring]
+
+  Container_Ext(movement, "Movement Service", "Java / Spring", "Calls upstream via Domain Facade")
+  Container_Ext(clientinfo, "Client Info Service", "Java / Spring", "Calls upstream via Domain Facade")
+  System_Ext(core, "Core Banking", "ISO 8583 over MQ")
+  System_Ext(supplement, "Client Supplement", "REST / mTLS")
+  System_Ext(openbank, "Open Banking", "PSD2 / REST")
+  System_Ext(legacy, "Legacy Systems", "SOAP / ESB")
+
+  Container_Boundary(integration, "Integration Service") {
+    Component(facade, "Domain Facade", "Spring service", "Single internal API for all upstream calls. Translates domain commands to adapter calls.")
+    Component(cb, "Circuit Breaker", "Resilience4j", "Per-adapter breaker. Opens on 5 consecutive failures. Half-open probe after 30s.")
+    Component(coreAdapter, "Core Banking Adapter", "ISO 8583 codec", "Translates domain operations to ISO 8583 messages. Maps response codes to domain results.")
+    Component(suppAdapter, "Supplement Adapter", "REST client", "Fetches and normalises client profile data. Validates output schema before returning.")
+    Component(obAdapter, "Open Banking Adapter", "PSD2 client", "Handles TPP consent flow. Validates eIDAS certificates. Rate limits per client_id.")
+    Component(legacyAdapter, "Legacy Adapter", "SOAP / JAXB", "Bridges SOAP envelope format to domain model. Handles ESB routing headers.")
+  }
+
+  Rel(movement, facade, "Account operations", "gRPC / mTLS")
+  Rel(clientinfo, facade, "Client info queries", "gRPC / mTLS")
+  Rel(facade, cb, "All upstream calls via breaker", "in-process")
+  Rel(cb, coreAdapter, "Core Banking calls", "in-process")
+  Rel(cb, suppAdapter, "Supplement calls", "in-process")
+  Rel(cb, obAdapter, "Open Banking calls", "in-process")
+  Rel(cb, legacyAdapter, "Legacy calls", "in-process")
+  Rel(coreAdapter, core, "Account debit/credit/query", "ISO 8583 / mTLS / MQ")
+  Rel(suppAdapter, supplement, "Client profile fetch", "REST / mTLS")
+  Rel(obAdapter, openbank, "TPP data access", "HTTPS / OAuth2")
+  Rel(legacyAdapter, legacy, "Legacy operations", "SOAP / ESB")
+
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")

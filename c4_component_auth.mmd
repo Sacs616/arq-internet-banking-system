@@ -1,0 +1,33 @@
+C4Component
+  title Component Diagram — Auth Service [Container: Java / Spring]
+
+  Person(client, "Retail client", "SPA or Mobile App")
+  Container_Ext(gateway, "API Gateway", "Kong / Envoy", "Routes inbound auth requests")
+  Container_Ext(idp, "Identity Provider", "Keycloak", "OIDC authority")
+  ContainerDb_Ext(cache, "Cache", "Redis", "Session and device store")
+  ContainerDb_Ext(eventbus, "Event Bus", "Kafka", "Receives published auth events")
+
+  Container_Boundary(auth, "Auth Service") {
+    Component(onboarding, "Onboarding Handler", "FIDO2 / WebAuthn lib", "Registers device credential. Verifies Face ID attestation. Binds key to Secure Enclave.")
+    Component(mfa, "MFA Orchestrator", "Spring component", "Sequences PIN, fingerprint and push OTP challenges. Enforces step-up on risk signal.")
+    Component(tokenissuer, "Token Issuer", "Nimbus JOSE+JWT", "Issues short-lived JWT RS256 15 min. Issues rotating refresh token bound to device fingerprint.")
+    Component(sessionmgr, "Session Manager", "Spring + Redis", "Creates, validates and revokes sessions. Enforces 15-min idle timeout.")
+    Component(devicereg, "Device Registry", "Spring + PostgreSQL", "Stores trusted device records. Manages certificate pins. Supports revocation.")
+    Component(risk, "Risk Engine", "Rules + ML scorer", "Evaluates geo, velocity and anomaly signals. Triggers MFA step-up on high score.")
+    Component(auditpub, "Audit Publisher", "Kafka producer", "Emits signed auth events for every login, failure and revocation.")
+  }
+
+  Rel(client, gateway, "Sends auth request", "HTTPS")
+  Rel(gateway, onboarding, "POST /register", "gRPC / mTLS")
+  Rel(gateway, mfa, "POST /authenticate", "gRPC / mTLS")
+  Rel(onboarding, devicereg, "Persists device credential", "in-process")
+  Rel(mfa, risk, "Requests risk score", "in-process")
+  Rel(mfa, tokenissuer, "Requests token on success", "in-process")
+  Rel(mfa, sessionmgr, "Creates session", "in-process")
+  Rel(tokenissuer, idp, "Validates OIDC claims", "OIDC / HTTPS")
+  Rel(sessionmgr, cache, "Reads/writes session state", "Redis / TLS")
+  Rel(risk, devicereg, "Reads device trust score", "in-process")
+  Rel(mfa, auditpub, "Emits login event", "in-process")
+  Rel(auditpub, eventbus, "Publishes auth events", "Kafka / SASL-TLS")
+
+  UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")

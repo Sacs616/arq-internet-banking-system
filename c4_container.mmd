@@ -1,0 +1,49 @@
+C4Container
+  title Container Diagram — Internet Banking Platform
+
+  Person(client, "Retail client", "Uses SPA or mobile app")
+
+  System_Ext(core, "Core Banking", "On-premise. ISO 8583 over MQ.")
+  System_Ext(supplement, "Client Supplement", "REST/mTLS.")
+  System_Ext(notif_providers, "Notification Providers", "FCM · Twilio · SendGrid")
+  System_Ext(idp, "Identity Provider", "Keycloak / Azure AD. OIDC.")
+
+  System_Boundary(platform, "Internet Banking Platform") {
+
+    Container(spa, "SPA", "React / TypeScript", "Browser-based client. Served via CDN.")
+    Container(mobile, "Mobile App", "Flutter", "iOS and Android. FIDO2 onboarding. Certificate pinning.")
+    Container(gateway, "API Gateway", "Kong / Envoy", "TLS termination. JWT validation. Rate limiting. mTLS to services.")
+    Container(auth, "Auth Service", "Java / Spring", "FIDO2 registration. MFA orchestration. JWT issuance. Session management.")
+    Container(movement, "Movement Service", "Java / Spring", "Transfers, payments, balance queries. Saga orchestrator. Transactional outbox.")
+    Container(notification, "Notification Service", "Node.js", "Consumes events. Dispatches push, SMS and email via Strategy pattern.")
+    Container(integration, "Integration Service", "Java / Spring", "Anti-Corruption Layer. Adapters for Core Banking, Supplement, Legacy and Open Banking.")
+    Container(audit_svc, "Audit Service", "Java / Spring", "Consumes all domain events. Enriches, signs and writes to WORM store.")
+    ContainerDb(opsdb, "Operational DB", "PostgreSQL HA", "Write model. Double-entry ledger. ACID. Synchronous replication.")
+    ContainerDb(cache, "Cache", "Redis Cluster", "Read model and session store. Cache-Aside pattern. TTL eviction.")
+    ContainerDb(eventbus, "Event Bus", "Apache Kafka", "Async backbone. Transactional Outbox relay. SASL/TLS. Schema registry.")
+    ContainerDb(auditstore, "Audit Store", "Kafka + WORM", "Append-only. HMAC-signed events. On-premise. 12-month retention.")
+    ContainerDb(secrets, "Secrets Store", "HashiCorp Vault / HSM", "Dynamic secrets. PKI for mTLS certs. Envelope encryption keys.")
+  }
+
+  Rel(client, spa, "Uses", "HTTPS")
+  Rel(client, mobile, "Uses", "HTTPS / cert-pinned")
+  Rel(spa, gateway, "API calls", "HTTPS")
+  Rel(mobile, gateway, "API calls", "HTTPS / TLS 1.3")
+  Rel(gateway, auth, "Routes auth requests", "gRPC / mTLS")
+  Rel(gateway, movement, "Routes payment requests", "gRPC / mTLS")
+  Rel(gateway, integration, "Routes upstream queries", "gRPC / mTLS")
+  Rel(auth, idp, "Delegates OIDC flow", "OIDC / HTTPS")
+  Rel(auth, cache, "Reads/writes sessions", "Redis protocol / TLS")
+  Rel(movement, opsdb, "Writes ledger entries", "JDBC / TLS")
+  Rel(movement, cache, "Reads balance (Cache-Aside)", "Redis protocol / TLS")
+  Rel(movement, eventbus, "Publishes via outbox", "Kafka / SASL-TLS")
+  Rel(eventbus, notification, "Delivers domain events", "Kafka consumer")
+  Rel(eventbus, audit_svc, "Delivers all events", "Kafka consumer")
+  Rel(notification, notif_providers, "Dispatches notifications", "HTTPS")
+  Rel(audit_svc, auditstore, "Writes signed events", "Kafka / WORM")
+  Rel(integration, core, "Account operations", "ISO 8583 / mTLS")
+  Rel(integration, supplement, "Client info queries", "REST / mTLS")
+  Rel(secrets, auth, "Issues signing keys", "Vault API / mTLS")
+  Rel(secrets, movement, "Issues DB credentials", "Vault API / mTLS")
+
+  UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
